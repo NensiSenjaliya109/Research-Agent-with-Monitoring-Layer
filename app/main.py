@@ -1,81 +1,210 @@
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from contextlib import asynccontextmanager
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
-import uvicorn
+"""
+app/main.py
+─────────────────────────────────────────────────────────────────
+STEP 3 + 12 + 13 — FastAPI Application
+
+WHAT:  The HTTP entry point. Exposes three endpoints:
+         GET  /health  — liveness probe (load balancers call this)
+         POST /ask     — the main research pipeline
+         GET  /logs    — view monitoring logs with optional filters
+
+WHY:   FastAPI gives us:
+         • Automatic OpenAPI docs at /docs
+         • Request validation via Pydantic (fail fast on bad input)
+         • Async support for future scaling
+         • Sub-millisecond router overhead
+
+PRODUCTION TIP:
+  Always add a /health endpoint.  Kubernetes, Docker, and load
+  balancers use it.  Never tie health to LLM availability — return
+  200 OK as long as the server process is alive.
+"""
+
+import logging
 import os
 import sys
+from contextlib import asynccontextmanager
+from typing import Optional
 
-# Ensure the root directory 'research-agent' is in sys.path when running 'python app/main.py'
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+import uvicorn
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
-from app.orchestrator import Orchestrator
-from app.monitoring.logger import ActivityLogger
+load_dotenv()
 
-orchestrator = Orchestrator()
-logger       = ActivityLogger()
-executor     = ThreadPoolExecutor(max_workers=4)  # For running sync code in async
+# ── Ensure project root is on Python path ─────────────────────────────────────
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from orchestrator import get_orchestrator
+from app.monitoring.tracker import read_logs
+
+# ── Logging setup ─────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+
+# ── Startup / Shutdown ────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Research Agent API starting...")
-    yield
-    print("🛑 Shutting down...")
+    """Warm up expensive resources (embeddings model, DB connection) on startup."""
+    logger.info("🚀 Starting Autonomous Research Agent…")
+
+    # Pre-initialize the orchestrator so first request is fast
+    orchestrator = get_orchestrator()
+    logger.info("✅ Orchestrator ready")
+
+    yield  # ← server is running here
+
+    logger.info("🛑 Shutting down Research Agent")
+
+
+# ── FastAPI App ───────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Autonomous Research Agent",
+    description=(
+        "A multi-agent research system powered by Google Gemini and ChromaDB. "
+        "Ask any question → get a researched, validated answer with metrics."
+    ),
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# Allow browser clients (Postman, Swagger UI, React apps, etc.)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-class QueryRequest(BaseModel):
-    query: str
+# ── Pydantic Schemas ──────────────────────────────────────────────────────────
 
-class MetricsModel(BaseModel):
-    latency_seconds: float
-    total_tokens: int
+class AskRequest(BaseModel):
+    query: str = Field(
+        ...,
+        min_length=3,
+        max_length=500,
+        description="The research question or topic to investigate",
+        examples=["What is quantum computing?"],
+    )
+
+class ValidationDetail(BaseModel):
+    overall_score: float
+    relevance_score: float
+    completeness_score: float
+    accuracy_confidence: float
+    is_acceptable: bool
+    issues: list
+    improvement_suggestions: str
+
+class Metrics(BaseModel):
+    total_latency_s: float
+    step_latencies_s: dict
+    total_input_tokens: int
+    total_output_tokens: int
     estimated_cost_usd: float
-    breakdown: dict = {}
 
-class ResearchResponse(BaseModel):
+class AskResponse(BaseModel):
+    request_id: str
     answer: str
-    sources: list[str]
+    sources: list
     validation_score: float
-    recommendation: str
-    issues: list[str]
-    metrics: MetricsModel
+    validation: dict
+    metrics: dict
+    error: Optional[str] = None
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "version": "1.0.0"}
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@app.post("/ask", response_model=ResearchResponse)
-async def ask(request: QueryRequest):
-    if not request.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
-    
-    # Run synchronous pipeline in thread pool to not block the event loop
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(executor, orchestrator.run, request.query)
-    return result
-
-@app.get("/logs")
-async def get_logs(limit: int = Query(default=50, le=500), event_type: str = None):
-    logs = logger.get_logs(limit=limit, event_type=event_type)
-    return {"logs": logs, "count": len(logs)}
-
-@app.get("/stats")
-async def get_stats():
-    return logger.get_stats()
+@app.get("/health", tags=["System"])
+async def health_check():
+    """
+    Liveness probe.
+    Always returns 200 OK if the server process is alive.
+    """
+    return {
+        "status": "ok",
+        "service": "autonomous-research-agent",
+        "version": "1.0.0",
+    }
 
 
+@app.post("/ask", response_model=AskResponse, tags=["Research"])
+async def ask(request: AskRequest):
+    """
+    **Main research endpoint.**
+
+    Runs the full pipeline:
+    1. Research Agent searches the web and stores in ChromaDB
+    2. Summarizer Agent does RAG + Gemini generation
+    3. Validator Agent scores the answer quality
+
+    Returns the answer, sources, validation score, and performance metrics.
+    """
+    logger.info(f"[API] POST /ask | query='{request.query}'")
+
+    try:
+        orchestrator = get_orchestrator()
+        result = orchestrator.run(query=request.query)
+        return AskResponse(**result)
+
+    except Exception as e:
+        logger.error(f"[API] /ask failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/logs", tags=["Monitoring"])
+async def get_logs(
+    limit: int = Query(default=20, ge=1, le=200, description="Max number of logs to return"),
+    query_filter: Optional[str] = Query(default=None, description="Filter logs by query text"),
+    date_filter: Optional[str] = Query(
+        default=None,
+        description="Filter by date (YYYY-MM-DD format)",
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+    ),
+):
+    """
+    **View monitoring logs.**
+
+    Returns logged requests in reverse chronological order.
+    Use `query_filter` and `date_filter` to narrow results.
+
+    Example: GET /logs?limit=10&query_filter=quantum
+    """
+    logs = read_logs(limit=limit, query_filter=query_filter, date_filter=date_filter)
+    return {
+        "total": len(logs),
+        "filters": {"query_filter": query_filter, "date_filter": date_filter},
+        "logs": logs,
+    }
+
+
+@app.get("/", tags=["System"])
+async def root():
+    return {
+        "message": "Autonomous Research Agent API",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "POST /ask": "Submit a research query",
+            "GET /logs": "View monitoring logs",
+        },
+    }
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    host = os.getenv("APP_HOST", "0.0.0.0")
+    port = int(os.getenv("APP_PORT", 8000))
+    uvicorn.run("app.main:app", host=host, port=port, reload=True)
