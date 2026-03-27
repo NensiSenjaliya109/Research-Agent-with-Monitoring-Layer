@@ -1,0 +1,14 @@
+# Environments
+venv/
+.env
+
+# ChromaDB Vector Database
+chroma_db/
+
+# Activity Logs
+logs/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
