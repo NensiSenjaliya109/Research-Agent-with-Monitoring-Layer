@@ -1,6 +1,6 @@
 # Environments
 venv/
-.env
+*.env
 
 # ChromaDB Vector Database
 chroma_db/
