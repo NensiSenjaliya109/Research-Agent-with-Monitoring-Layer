@@ -18,3 +18,4 @@ sentence-transformers==3.0.1
 # ── Utilities ─────────────────────────────────────────────
 tiktoken==0.7.0
 tenacity==8.3.0
+streamlit==1.35.0

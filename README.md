@@ -225,3 +225,33 @@ Liveness probe — always returns `{"status": "ok"}`.
 | Poor chunking | Test chunk size empirically — 400-600 chars is a good start |
 | No error isolation | Wrap each agent in try/except, return partial results |
 | Embedding mismatch | Use the same model to embed queries and documents |
+
+---
+
+## 🎨 Streamlit Frontend
+
+A premium, interactive AI research dashboard is available under `streamlit_app.py`. It communicates directly with the backend orchestrator and monitors metrics and history.
+
+### How to Run Streamlit Locally
+1. Make sure your virtual environment is active and dependencies are installed:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Run the Streamlit app:
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+3. Open `http://localhost:8501` in your browser.
+
+### Deploying to Streamlit Community Cloud
+1. Push your project to a public GitHub repository.
+2. Go to [share.streamlit.io](https://share.streamlit.io/) and log in with your GitHub account.
+3. Click **New app**, select your repository, branch, and specify `streamlit_app.py` as the entry file.
+4. Open **Advanced settings** and paste your environment variables into the secrets text box:
+   ```toml
+   GEMINI_API_KEY = "your-actual-api-key"
+   SERPAPI_API_KEY = "your-optional-serpapi-key"
+   EMBEDDING_BACKEND = "sentence_transformers"
+   GEMINI_LLM_MODEL = "gemini-2.5-flash"
+   ```
+5. Click **Deploy!**
