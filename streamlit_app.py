@@ -502,26 +502,14 @@ if st.session_state.research_results:
         st.markdown("### 📥 Export Research Report")
         
         pdf_bytes = generate_report_pdf(res, st.session_state.query)
-        md_report = generate_report_markdown(res, st.session_state.query)
-        
-        dl_col1, dl_col2 = st.columns(2)
-        with dl_col1:
-            st.download_button(
-                label="📕 Download PDF Report (.pdf)",
-                data=pdf_bytes,
-                file_name=f"research_report_{res.get('request_id', 'output')}.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True
-            )
-        with dl_col2:
-            st.download_button(
-                label="📄 Download Markdown (.md)",
-                data=md_report,
-                file_name=f"research_report_{res.get('request_id', 'output')}.md",
-                mime="text/markdown",
-                use_container_width=True
-            )
+        st.download_button(
+            label="📕 Download PDF Report (.pdf)",
+            data=pdf_bytes,
+            file_name=f"research_report_{res.get('request_id', 'output')}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True
+        )
             
     # Right Column: Score, Metrics & Latency
     with col_right:
