@@ -22,7 +22,9 @@ import base64
 
 @st.cache_data
 def get_custom_css():
-    img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "bg_chatbot.webp")
+    img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "bg_custom.webp")
+    if not os.path.exists(img_path):
+        img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "bg_chatbot.webp")
     if not os.path.exists(img_path):
         img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "bg_chatbot.png")
     

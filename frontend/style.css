@@ -28,7 +28,7 @@
 html { font-size: 16px; scroll-behavior: smooth; }
 body {
   font-family: 'Inter', sans-serif;
-  background: linear-gradient(rgba(5, 13, 26, 0.86), rgba(5, 13, 26, 0.90)), url('assets/bg_chatbot.png') no-repeat center center fixed;
+  background: linear-gradient(rgba(5, 13, 26, 0.86), rgba(5, 13, 26, 0.90)), url('assets/bg_custom.webp') no-repeat center center fixed;
   background-size: cover;
   color: var(--text);
   min-height: 100vh;
