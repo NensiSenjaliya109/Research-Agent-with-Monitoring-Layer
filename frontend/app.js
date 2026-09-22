@@ -355,32 +355,7 @@ function formatMarkdown(text) {
   return html;
 }
 
-function exportCurrentReport(ext = 'md') {
+function exportPDF() {
   if (!lastData) return;
-  const q = document.getElementById('query-input')?.value.trim() || lastData.query || 'Research Topic';
-  const reqId = lastData.request_id || 'n/a';
-  const score = (lastData.validation_score || 0).toFixed(2);
-  const sources = (lastData.sources || []).map(s => `- ${s}`).join('\n') || '- None';
-  const rawMetrics = lastData.metrics || {};
-  
-  const content = `# 🤖 Autonomous Research Report\n\n` +
-    `**Query:** ${q}\n` +
-    `**Request ID:** \`${reqId}\` \n` +
-    `**Date:** ${new Date().toLocaleString()}\n\n---\n\n` +
-    `## 📝 Executive Summary\n\n${lastData.answer || 'No answer generated.'}\n\n---\n\n` +
-    `## 🌐 Information Sources\n\n${sources}\n\n---\n\n` +
-    `## 🏆 Quality Score: ${score}\n\n` +
-    `## ⚡ Metrics\n` +
-    `- **Latency:** ${rawMetrics.latency_seconds || '0'}s\n` +
-    `- **Estimated Cost:** $${(rawMetrics.estimated_cost_usd || 0).toFixed(5)}\n` +
-    `- **Total Tokens:** ${rawMetrics.total_tokens || 0}\n`;
-
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', `research_report_${reqId}.${ext}`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  window.print();
 }
