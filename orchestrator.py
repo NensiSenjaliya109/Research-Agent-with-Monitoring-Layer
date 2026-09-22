@@ -34,6 +34,7 @@ from app.agents.research_agent import ResearchAgent
 from app.agents.summarizer_agent import SummarizerAgent
 from app.agents.validator_agent import ValidatorAgent
 from app.monitoring.tracker import MetricsTracker, log_request
+from app.cache.semantic_cache import get_semantic_cache
 
 logger = logging.getLogger(__name__)
 
@@ -48,24 +49,22 @@ class Orchestrator:
         self.research_agent = ResearchAgent(num_search_results=7)
         self.summarizer_agent = SummarizerAgent(n_retrieve=7)
         self.validator_agent = ValidatorAgent()
+        self.cache = get_semantic_cache()
 
     def run(self, query: str) -> dict:
         """
         Run the full pipeline for a user query.
-
-        Returns:
-          {
-            "answer"           : str,
-            "sources"          : List[str],
-            "validation"       : dict,
-            "validation_score" : float,
-            "metrics"          : dict,
-            "request_id"       : str,
-            "error"            : str | None,
-          }
+        Checks SemanticCache first for instant $0-cost response.
         """
         tracker = MetricsTracker(query=query)
         logger.info(f"[Orchestrator] === NEW REQUEST [{tracker.request_id}] === query='{query}'")
+
+        # ── Stage 0: Semantic Cache Check ─────────────────────────────
+        cached_result, sim_score = self.cache.get(query)
+        if cached_result is not None:
+            logger.info(f"[Orchestrator] ⚡ CACHE HIT! Returning cached answer (similarity={sim_score:.4f})")
+            cached_result["request_id"] = tracker.request_id
+            return cached_result
 
         answer = ""
         sources = []
@@ -133,7 +132,7 @@ class Orchestrator:
             f"cost=${tracker.estimated_cost_usd:.6f}"
         )
 
-        return {
+        response_data = {
             "request_id": tracker.request_id,
             "answer": answer,
             "sources": sources,
@@ -142,9 +141,17 @@ class Orchestrator:
             "metrics": {
                 **record["metrics"],
                 "stored_chunks": stored_chunks,
+                "cache_hit": False,
             },
+            "cached": False,
             "error": error_msg,
         }
+
+        # Store clean response in semantic cache for future queries
+        if not error_msg and answer:
+            self.cache.set(query, response_data)
+
+        return response_data
 
 
 # ── Singleton accessor (reuse agent instances across requests) ────────────────

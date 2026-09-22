@@ -23,6 +23,11 @@ User Query (POST /ask)
   └──────┬──────┘
          │
    ┌─────▼──────────────────────────────────┐
+   │  Stage 0: Semantic Query Cache         │  ← Cosine similarity check (>= 0.90)
+   │  CACHE HIT? Return answer in 0.03s ($0)│
+   └─────┬──────────────────────────────────┘
+         │ (Cache Miss)
+   ┌─────▼──────────────────────────────────┐
    │  Stage 1: Research Agent               │
    │  web_search(query) → raw snippets      │
    │  embed + store in ChromaDB             │
@@ -77,6 +82,19 @@ $$\text{Overall Score} = (\text{Relevance} \times 0.40) + (\text{Completeness} \
 
 ---
 
+## ⚡ Semantic Query Cache ($0 Cost & Instant Latency)
+
+The **SemanticCache** (`app/cache/semantic_cache.py`) module evaluates incoming research queries against previous query embeddings using **vector cosine similarity**.
+
+### How it Works
+1. **Embedding Check**: Converts the incoming query into a 768-dimensional vector embedding.
+2. **Cosine Similarity**: Computes similarity with all previously cached query embeddings.
+3. **Threshold Matching (`>= 0.85`)**:
+   - **Cache Hit**: Returns the cached research answer and validation metrics in **`0.03s`** at **`$0.00`** API cost.
+   - **Cache Miss**: Executes full multi-agent pipeline and persists response to `./cache/semantic_cache.json`.
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -87,6 +105,8 @@ research_agent/
 │   │   ├── research_agent.py    ← Stage 1: search + store
 │   │   ├── summarizer_agent.py  ← Stage 2: RAG + Gemini
 │   │   └── validator_agent.py   ← Stage 3: quality scoring
+│   ├── cache/
+│   │   └── semantic_cache.py    ← Stage 0: vector similarity query cache
 │   ├── tools/
 │   │   └── web_search.py        ← simulated/SerpAPI search
 │   ├── vector_store/

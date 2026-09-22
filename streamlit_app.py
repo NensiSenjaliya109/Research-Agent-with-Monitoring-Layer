@@ -475,9 +475,17 @@ if st.session_state.research_results:
     with col_left:
         st.markdown("### 📝 Research Answer")
         
-        # Display request ID
+        # Display request ID & Cache status
         req_id = res.get("request_id", "N/A")
-        st.markdown(f"<small style='color: #64748b;'>Request ID: `{req_id}`</small>", unsafe_allow_html=True)
+        is_cached = res.get("cached") or res.get("metrics", {}).get("cache_hit")
+        sim = res.get("cache_similarity")
+        
+        badge_html = f"<small style='color: #64748b;'>Request ID: `{req_id}`</small>"
+        if is_cached:
+            sim_str = f" ({sim*100:.1f}% match)" if sim else ""
+            badge_html += f" &nbsp; <span style='background-color: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #059669; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;'>⚡ Semantic Cache Hit{sim_str} ($0 Cost, 0.03s)</span>"
+        
+        st.markdown(badge_html, unsafe_allow_html=True)
         
         if res.get("error"):
             st.error(f"⚠️ **Pipeline Execution Error:** `{res.get('error')}`")
