@@ -45,8 +45,8 @@ class Orchestrator:
     """
 
     def __init__(self):
-        self.research_agent = ResearchAgent(num_search_results=5)
-        self.summarizer_agent = SummarizerAgent(n_retrieve=5)
+        self.research_agent = ResearchAgent(num_search_results=7)
+        self.summarizer_agent = SummarizerAgent(n_retrieve=7)
         self.validator_agent = ValidatorAgent()
 
     def run(self, query: str) -> dict:

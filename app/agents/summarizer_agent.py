@@ -30,23 +30,22 @@ from app.monitoring.tracker import MetricsTracker
 logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = """You are an expert research assistant. Your task is to synthesize 
-information from the provided context and generate a clear, accurate, and well-structured answer.
+information from the provided context and generate a thorough, clear, accurate, and well-structured research response.
 
 Rules:
-- Base your answer ONLY on the provided context
-- Be comprehensive but concise
-- Use clear headings or bullet points if the answer is complex
-- If the context does not fully answer the question, say so honestly
-- Do not invent facts not present in the context"""
+- Cover foundational definitions, core principles, key mechanisms, and practical applications in detail
+- Base your answer on the provided context, complementing it with well-established domain fundamentals if context is brief
+- Use structured headings and bullet points for high readability
+- Ensure no major core concepts of the topic are omitted"""
 
-_SUMMARIZER_PROMPT = """Given the following research context, provide a comprehensive answer to the query.
+_SUMMARIZER_PROMPT = """Given the following research context, provide a thorough and complete answer to the query.
 
 QUERY: {query}
 
 RETRIEVED CONTEXT:
 {context}
 
-Please provide a well-structured answer based on the above context."""
+Please provide a detailed, well-structured answer explaining the core concepts, mechanisms, and key details."""
 
 
 class SummarizerAgent:
