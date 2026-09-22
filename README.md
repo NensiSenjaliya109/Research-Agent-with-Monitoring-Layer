@@ -4,6 +4,12 @@ A production-grade, multi-agent research system powered by **Google Gemini** and
 
 Submit a research query → get a sourced, validated answer with full performance metrics.
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://research-agent-with-monitoring-core.streamlit.app)
+
+### 🌐 Live Demo
+
+👉 **[Try it live on Streamlit Cloud](https://research-agent-with-monitoring-core.streamlit.app)**
+
 ---
 
 ## 🏗️ Architecture
