@@ -18,6 +18,77 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+ROBOT_LOTTIE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "robot-sad-mood.json")
+
+def render_robot_background(json_path=ROBOT_LOTTIE_PATH):
+    """Renders floating background robot Lottie animation in Streamlit."""
+    if not os.path.exists(json_path):
+        return
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            lottie_json_str = f.read()
+        
+        html_code = f"""
+        <style>
+        .robot-bg {{
+            position: fixed;
+            top: 70px;
+            right: 40px;
+            width: 240px;
+            height: 240px;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.25;
+            filter: drop-shadow(0 10px 20px rgba(99,102,241,0.2));
+            animation: robotDrift 8s ease-in-out infinite alternate;
+        }}
+        .robot-bg__figure {{
+            width: 100%;
+            height: 100%;
+        }}
+        @keyframes robotDrift {{
+            0% {{ transform: translateY(0px) rotate(0deg); }}
+            100% {{ transform: translateY(-24px) rotate(4deg); }}
+        }}
+        [data-testid="stAppViewContainer"] > .main {{
+            position: relative;
+            z-index: 1;
+        }}
+        </style>
+        <div class="robot-bg"><div class="robot-bg__figure" id="streamlitRobotBg"></div></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+        <script>
+        (function() {{
+            const animData = {lottie_json_str};
+            function initRobot() {{
+                const el = document.getElementById('streamlitRobotBg');
+                if (el && window.lottie && !el.getAttribute('data-lottie-loaded')) {{
+                    el.setAttribute('data-lottie-loaded', 'true');
+                    window.lottie.loadAnimation({{
+                        container: el,
+                        renderer: 'svg',
+                        loop: true,
+                        autoplay: true,
+                        animationData: animData
+                    }});
+                }} else if (!window.lottie || !el) {{
+                    setTimeout(initRobot, 200);
+                }}
+            }}
+            if (document.readyState === 'loading') {{
+                document.addEventListener('DOMContentLoaded', initRobot);
+            }} else {{
+                initRobot();
+            }}
+        }})();
+        </script>
+        """
+        st.markdown(html_code, unsafe_allow_html=True)
+    except Exception as e:
+        pass
+
+render_robot_background()
+
 import base64
 
 @st.cache_data

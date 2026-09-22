@@ -288,6 +288,7 @@ A premium, interactive AI research dashboard is available under `streamlit_app.p
 - 🚀 **Real-time Pipeline Tracking**: Visualizes Research, RAG Summarization, and LLM-as-a-Judge validation.
 - 🏆 **Quality Auditor**: Real-time relevance, completeness, and accuracy scoring.
 - 📥 **Export Research Reports**: Download official research reports directly in **PDF (`.pdf`)** format with complete metrics, quality validation scores, and source citations.
+- 🤖 **Floating Lottie Robot Background**: Interactive drifting Lottie robot animation overlay floating subtilely over dark/glassmorphic themes across both Web App and Streamlit dashboard.
 
 ### How to Run Streamlit Locally
 1. Make sure your virtual environment is active and dependencies are installed:

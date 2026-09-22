@@ -54,6 +54,30 @@ body {
 .orb-2 { width: 500px; height: 500px; background: radial-gradient(circle, #06b6d4, transparent 70%); bottom: -150px; right: -150px; animation-delay: -10s; }
 @keyframes drift { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(40px,30px) scale(1.08); } }
 
+/* ── Floating Background Robot ─────────────────────────────── */
+.robot-bg {
+  position: fixed;
+  top: 80px;
+  right: 40px;
+  width: 260px;
+  height: 260px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.25;
+  filter: drop-shadow(0 10px 20px rgba(99,102,241,0.2));
+  animation: robotDrift 8s ease-in-out infinite alternate;
+}
+
+.robot-bg__figure {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes robotDrift {
+  0% { transform: translateY(0px) rotate(0deg); }
+  100% { transform: translateY(-24px) rotate(4deg); }
+}
+
 /* ── Header ────────────────────────────────────────────────── */
 .header {
   position: sticky; top: 0; z-index: 100;
