@@ -41,7 +41,7 @@ _API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 _LLM_MODEL = os.getenv(
     "GEMINI_LLM_MODEL",
-    "gemini-2.5-flash",
+    "gemini-3.6-flash",
 )
 
 _EMBED_MODEL = os.getenv(
