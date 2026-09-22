@@ -18,35 +18,59 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+import base64
+
+def get_base64_bg(img_path):
+    if os.path.exists(img_path):
+        try:
+            with open(img_path, "rb") as f:
+                data = base64.b64encode(f.read()).decode()
+                return f"data:image/png;base64,{data}"
+        except Exception:
+            pass
+    return ""
+
+bg_image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "bg_chatbot.png")
+bg_uri = get_base64_bg(bg_image_path)
+
+bg_style = f"background: linear-gradient(rgba(5, 13, 26, 0.86), rgba(5, 13, 26, 0.90)), url('{bg_uri}') no-repeat center center fixed !important; background-size: cover !important;" if bg_uri else "background-color: #050d1a;"
+sidebar_bg_style = f"background: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.93)), url('{bg_uri}') no-repeat center center !important; background-size: cover !important;" if bg_uri else "background-color: #0b1528;"
+
 # Premium Custom CSS
-st.markdown("""
+st.markdown(f"""
 <style>
     /* Main container styling */
-    .stApp {
-        background-color: #050d1a;
+    .stApp {{
+        {bg_style}
         color: #e2e8f0;
-    }
+    }}
+    
+    /* Sidebar container styling */
+    [data-testid="stSidebar"] {{
+        {sidebar_bg_style}
+    }}
     
     /* Customize headers */
-    h1, h2, h3 {
+    h1, h2, h3 {{
         color: #f8fafc !important;
         font-weight: 700 !important;
-    }
+    }}
     
     /* Styled container cards */
-    div.element-container:has(div.metric-card) {
-        background-color: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+    div.element-container:has(div.metric-card) {{
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 12px;
         padding: 18px;
         margin-bottom: 12px;
-    }
+        backdrop-filter: blur(10px);
+    }}
     
     /* Custom status indicators */
-    .status-text {
+    .status-text {{
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.85rem;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 

@@ -1,0 +1,10 @@
+<html>
+  <script>
+    var filename = location.href;
+    filename = filename.substr(filename.lastIndexOf("/") + 1);
+    var start = filename.indexOf("_") + 1;
+    var end = filename.indexOf(".");
+    var works_id = filename.slice(start, end);
+    window.location.href = "http://new.90sheji.com/?m=feedback&works_id=" + works_id;
+  </script>
+</html>
