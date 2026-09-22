@@ -1,4 +1,4 @@
-﻿// ── State Management & Constants ──────────────────────────────
+// ── State Management & Constants ──────────────────────────────
 const API_BASE = ""; // Uses relative path for convenience when hosted on same server
 let currentQueryId = null;
 
@@ -111,8 +111,10 @@ function updateStep(stepId, state, icon) {
   document.getElementById(`${stepId}-status`).textContent = icon;
 }
 
-// ── Render Results ─────────────────────────────────────────────
+let lastData = null;
+
 function renderResults(data) {
+  lastData = data;
   document.getElementById('ask-btn').disabled = false;
   
   if (data.error) {
@@ -351,4 +353,34 @@ function formatMarkdown(text) {
   html = html.replace(/^\* (.*?)$/gm, '<li>$1</li>');
   
   return html;
+}
+
+function exportCurrentReport(ext = 'md') {
+  if (!lastData) return;
+  const q = document.getElementById('query-input')?.value.trim() || lastData.query || 'Research Topic';
+  const reqId = lastData.request_id || 'n/a';
+  const score = (lastData.validation_score || 0).toFixed(2);
+  const sources = (lastData.sources || []).map(s => `- ${s}`).join('\n') || '- None';
+  const rawMetrics = lastData.metrics || {};
+  
+  const content = `# 🤖 Autonomous Research Report\n\n` +
+    `**Query:** ${q}\n` +
+    `**Request ID:** \`${reqId}\` \n` +
+    `**Date:** ${new Date().toLocaleString()}\n\n---\n\n` +
+    `## 📝 Executive Summary\n\n${lastData.answer || 'No answer generated.'}\n\n---\n\n` +
+    `## 🌐 Information Sources\n\n${sources}\n\n---\n\n` +
+    `## 🏆 Quality Score: ${score}\n\n` +
+    `## ⚡ Metrics\n` +
+    `- **Latency:** ${rawMetrics.latency_seconds || '0'}s\n` +
+    `- **Estimated Cost:** $${(rawMetrics.estimated_cost_usd || 0).toFixed(5)}\n` +
+    `- **Total Tokens:** ${rawMetrics.total_tokens || 0}\n`;
+
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `research_report_${reqId}.${ext}`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }

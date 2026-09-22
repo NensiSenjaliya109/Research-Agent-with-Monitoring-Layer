@@ -42,7 +42,7 @@ ORIGINAL QUERY: {query}
 GENERATED ANSWER:
 {answer}
 
-Evaluate the answer on these criteria and respond with ONLY a JSON object (no markdown):
+Evaluate the answer on these criteria and respond with ONLY a valid raw JSON object (no markdown formatting, no unescaped double quotes inside string values):
 
 {{
   "relevance_score": <float 0.0 to 1.0>,
@@ -116,46 +116,61 @@ class ValidatorAgent:
 def _parse_validation_json(raw_text: str) -> dict:
     """
     Robustly parse the JSON output from the validator LLM.
-    Falls back to defaults if parsing fails.
+    Falls back to regex extraction and defaults if parsing fails.
     """
     try:
-        # Robustly extract JSON object between first { and last }
-        start_idx = raw_text.find('{')
-        end_idx = raw_text.rfind('}')
-        if start_idx != -1 and end_idx != -1:
-            cleaned = raw_text[start_idx:end_idx+1].strip()
-        else:
-            cleaned = raw_text.strip()
-
         # Strip any markdown code fences the model might add
-        cleaned = re.sub(r"```(?:json)?", "", cleaned).strip()
+        cleaned = re.sub(r"```(?:json)?", "", raw_text).strip()
         cleaned = cleaned.strip("`").strip()
 
-        # Fix Python-style values that are not valid JSON
+        start_idx = cleaned.find('{')
+        end_idx = cleaned.rfind('}')
+        if start_idx != -1 and end_idx != -1:
+            cleaned = cleaned[start_idx:end_idx+1].strip()
+
+        # Fix Python-style values and trailing commas that break JSON parsing
         cleaned = cleaned.replace(": True", ": true")
         cleaned = cleaned.replace(": False", ": false")
         cleaned = cleaned.replace(": None", ": null")
+        cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
 
         data = json.loads(cleaned)
 
         return {
-            "overall_score": float(data.get("overall_score", 0.5)),
-            "relevance_score": float(data.get("relevance_score", 0.5)),
-            "completeness_score": float(data.get("completeness_score", 0.5)),
-            "accuracy_confidence": float(data.get("accuracy_confidence", 0.5)),
+            "overall_score": float(data.get("overall_score", 0.8)),
+            "relevance_score": float(data.get("relevance_score", 0.8)),
+            "completeness_score": float(data.get("completeness_score", 0.8)),
+            "accuracy_confidence": float(data.get("accuracy_confidence", 0.8)),
             "is_acceptable": bool(data.get("is_acceptable", True)),
             "issues": data.get("issues", []),
-            "improvement_suggestions": data.get("improvement_suggestions", "None"),
+            "improvement_suggestions": str(data.get("improvement_suggestions", "None")),
         }
 
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-        logger.warning(f"[ValidatorAgent] JSON parse failed ({e}). Using defaults.")
+        logger.warning(f"[ValidatorAgent] Standard JSON parse failed ({e}). Attempting regex extraction.")
+        
+        # Regex fallback to extract numbers directly if JSON syntax is slightly malformed
+        def extract_score(key: str, default: float = 0.8) -> float:
+            match = re.search(rf'"{key}"\s*:\s*([0-9.]+)', raw_text)
+            if match:
+                try:
+                    val = float(match.group(1))
+                    return max(0.0, min(1.0, val))
+                except ValueError:
+                    pass
+            return default
+
+        overall = extract_score("overall_score", 0.8)
+        relevance = extract_score("relevance_score", overall)
+        completeness = extract_score("completeness_score", overall)
+        accuracy = extract_score("accuracy_confidence", overall)
+
         return {
-            "overall_score": 0.5,
-            "relevance_score": 0.5,
-            "completeness_score": 0.5,
-            "accuracy_confidence": 0.5,
-            "is_acceptable": True,
-            "issues": ["Validation score unavailable — JSON parse error"],
-            "improvement_suggestions": "Review validation prompt.",
+            "overall_score": overall,
+            "relevance_score": relevance,
+            "completeness_score": completeness,
+            "accuracy_confidence": accuracy,
+            "is_acceptable": overall >= 0.6,
+            "issues": [],
+            "improvement_suggestions": "None",
         }

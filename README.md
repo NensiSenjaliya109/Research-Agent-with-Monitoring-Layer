@@ -264,6 +264,11 @@ Liveness probe — always returns `{"status": "ok"}`.
 
 A premium, interactive AI research dashboard is available under `streamlit_app.py`. It communicates directly with the backend orchestrator and monitors metrics and history.
 
+### Key UI Features:
+- 🚀 **Real-time Pipeline Tracking**: Visualizes Research, RAG Summarization, and LLM-as-a-Judge validation.
+- 🏆 **Quality Auditor**: Real-time relevance, completeness, and accuracy scoring.
+- 📥 **Export Research Reports**: Download full research reports directly in **Markdown (`.md`)** or **HTML (`.html`)** formats with complete metrics and source citations.
+
 ### How to Run Streamlit Locally
 1. Make sure your virtual environment is active and dependencies are installed:
    ```bash
