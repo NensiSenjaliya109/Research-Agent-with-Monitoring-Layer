@@ -51,6 +51,32 @@ User Query (POST /ask)
 
 ---
 
+## 🏆 Quality Validator Scoring System
+
+The **Validator Agent** (`app/agents/validator_agent.py`) uses an **LLM-as-a-Judge** pattern to automatically evaluate the quality of the generated research response before returning it.
+
+### Evaluation Criteria
+
+| Metric | Weight | Description |
+|---|---|---|
+| **Relevance Score** | `40%` | Does the answer directly address the user's research query? |
+| **Completeness Score** | `30%` | Does the response cover key technical aspects and necessary context? |
+| **Accuracy Confidence** | `30%` | Based on reasoning coherence and source alignment, does it appear factually sound? |
+
+### Scoring Formula
+
+The overall score is a weighted sum of the individual criteria:
+
+$$\text{Overall Score} = (\text{Relevance} \times 0.40) + (\text{Completeness} \times 0.30) + (\text{Accuracy Confidence} \times 0.30)$$
+
+### Status Classification
+
+- **`Score >= 0.75`**: 🟢 **Excellent** — High confidence, fully grounded research answer.
+- **`0.60 <= Score < 0.75`**: 🟡 **Acceptable** — Good response, meets basic requirements.
+- **`Score < 0.60`**: 🔴 **Poor / Rejected** — Low confidence, flagged issues, or pipeline error.
+
+---
+
 ## 📁 Project Structure
 
 ```
