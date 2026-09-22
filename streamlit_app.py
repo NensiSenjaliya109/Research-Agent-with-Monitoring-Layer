@@ -106,21 +106,24 @@ with st.sidebar:
                 use_container_width=True
             ):
                 st.session_state.query = log["query"]
+                log_err = log.get("error")
+                issues_list = [f"Pipeline Error: {log_err}"] if log_err else []
                 st.session_state.research_results = {
                     "answer": log.get("final_answer", ""),
                     "sources": log.get("sources", []),
                     "validation_score": score,
                     "validation": {
                         "overall_score": score,
-                        "relevance_score": log.get("validation_score", 0.0), # Fallback mapping
+                        "relevance_score": score,
                         "completeness_score": score,
                         "accuracy_confidence": score,
                         "is_acceptable": score >= 0.6,
-                        "issues": [],
+                        "issues": issues_list,
                         "improvement_suggestions": "N/A"
                     },
                     "metrics": log.get("metrics", {}),
-                    "request_id": log.get("request_id", "N/A")
+                    "request_id": log.get("request_id", "N/A"),
+                    "error": log_err
                 }
                 st.rerun()
 
@@ -177,16 +180,21 @@ if submit_btn and query_input:
             results = orchestrator.run(query=query_input)
             
             # Map keys to fit the UI output safely
-            if "validation" not in results:
-                results["validation"] = {
-                    "overall_score": results.get("validation_score", 0.0),
-                    "relevance_score": results.get("validation_score", 0.0),
-                    "completeness_score": results.get("validation_score", 0.0),
-                    "accuracy_confidence": results.get("validation_score", 0.0),
-                    "is_acceptable": results.get("validation_score", 0.0) >= 0.6,
-                    "issues": results.get("issues", []),
-                    "improvement_suggestions": results.get("recommendation", "N/A")
-                }
+            val_data = results.get("validation") or {}
+            err_data = results.get("error")
+            issues = val_data.get("issues", [])
+            if err_data and err_data not in issues:
+                issues = [f"Pipeline Error: {err_data}"] + issues
+
+            results["validation"] = {
+                "overall_score": val_data.get("overall_score", results.get("validation_score", 0.0)),
+                "relevance_score": val_data.get("relevance_score", results.get("validation_score", 0.0)),
+                "completeness_score": val_data.get("completeness_score", results.get("validation_score", 0.0)),
+                "accuracy_confidence": val_data.get("accuracy_confidence", results.get("validation_score", 0.0)),
+                "is_acceptable": val_data.get("is_acceptable", results.get("validation_score", 0.0) >= 0.6),
+                "issues": issues,
+                "improvement_suggestions": val_data.get("improvement_suggestions", "N/A")
+            }
             
             st.session_state.research_results = results
             status.update(label="✅ Research Pipeline Completed!", state="complete", expanded=False)
@@ -208,6 +216,9 @@ if st.session_state.research_results:
         # Display request ID
         req_id = res.get("request_id", "N/A")
         st.markdown(f"<small style='color: #64748b;'>Request ID: `{req_id}`</small>", unsafe_allow_html=True)
+        
+        if res.get("error"):
+            st.error(f"⚠️ **Pipeline Execution Error:** `{res.get('error')}`")
         
         # Answer content
         st.markdown(res.get("answer", "No answer generated."))

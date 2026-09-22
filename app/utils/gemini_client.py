@@ -41,12 +41,12 @@ _API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 _LLM_MODEL = os.getenv(
     "GEMINI_LLM_MODEL",
-    "gemini-3.6-flash",
+    "gemini-2.5-flash",
 )
 
 _EMBED_MODEL = os.getenv(
     "GEMINI_EMBED_MODEL",
-    "gemini-embedding-2",
+    "text-embedding-004",
 )
 
 # Keep 768 if your existing vector database/index expects 768 dimensions.
