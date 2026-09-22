@@ -60,14 +60,14 @@ if "research_results" not in st.session_state:
 def set_query(q):
     st.session_state.query = q
 
+import re
 from fpdf import FPDF
 
 class PDFReport(FPDF):
     def header(self):
         self.set_font("Helvetica", "B", 10)
         self.set_text_color(100, 116, 139)
-        self.cell(0, 8, "Autonomous Research Agent - Official Report", border=False, align="R")
-        self.ln(8)
+        self.cell(0, 8, "Autonomous Research Agent - Official Report", align="R", new_x="LMARGIN", new_y="NEXT")
         self.line(10, 16, 200, 16)
         self.ln(4)
 
@@ -76,6 +76,80 @@ class PDFReport(FPDF):
         self.set_font("Helvetica", "I", 9)
         self.set_text_color(148, 163, 184)
         self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
+
+def clean_text_for_pdf(text: str) -> str:
+    replacements = {
+        "—": "-", "–": "-", "’": "'", "‘": "'",
+        "“": '"', "”": '"', "…": "...", "•": "*",
+        "―": "-", "?": "-"
+    }
+    for orig, rep in replacements.items():
+        text = text.replace(orig, rep)
+    text = re.sub(r'[^\x00-\xFF]', '', text)
+    return text
+
+def parse_markdown_to_pdf(pdf: FPDF, markdown_text: str):
+    cleaned = clean_text_for_pdf(markdown_text)
+    lines = cleaned.split("\n")
+    
+    for line in lines:
+        pdf.set_x(pdf.l_margin)
+        line_str = line.strip()
+        if not line_str:
+            pdf.ln(2)
+            continue
+            
+        # Ignore markdown table separator lines like |---|---|
+        if re.match(r"^\|?\s*:?-+:?\s*\|", line_str):
+            continue
+            
+        # Table rows (| Col | Col |)
+        if line_str.startswith("|") and line_str.endswith("|"):
+            cells = [c.strip() for c in line_str.strip("|").split("|")]
+            cells = [re.sub(r"\*\*|\*|`", "", c) for c in cells]
+            row_text = "  |  ".join(cells)
+            safe_row = row_text.encode('latin-1', 'replace').decode('latin-1')
+            pdf.set_font("Helvetica", "B" if pdf.get_y() < 60 else "", 9)
+            pdf.set_text_color(51, 65, 85)
+            pdf.multi_cell(190, 5, safe_row)
+            continue
+
+        # Headings (#, ##, ###, ####)
+        if line_str.startswith("#"):
+            heading_text = re.sub(r"^#+\s*", "", line_str)
+            heading_text = re.sub(r"\*\*|\*|`", "", heading_text) # strip stars
+            safe_h = heading_text.encode('latin-1', 'replace').decode('latin-1')
+            
+            pdf.ln(3)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(15, 23, 42)
+            pdf.cell(190, 7, safe_h, new_x="LMARGIN", new_y="NEXT")
+            continue
+
+        # Bullet points (*, -, +)
+        if line_str.startswith(("* ", "- ", "+ ")):
+            bullet_text = re.sub(r"^[\*\-\+]\s*", "", line_str)
+            clean_b = re.sub(r"\*\*(.*?)\*\*", r"\1", bullet_text) # strip bold stars
+            clean_b = re.sub(r"\*(.*?)\*", r"\1", clean_b)
+            clean_b = re.sub(r"`(.*?)`", r"\1", clean_b)
+            
+            safe_b = f"  - {clean_b}".encode('latin-1', 'replace').decode('latin-1')
+            
+            pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(51, 65, 85)
+            pdf.multi_cell(190, 6, safe_b)
+            continue
+
+        # Normal paragraph text
+        clean_p = re.sub(r"\*\*(.*?)\*\*", r"\1", line_str)
+        clean_p = re.sub(r"\*(.*?)\*", r"\1", clean_p)
+        clean_p = re.sub(r"`(.*?)`", r"\1", clean_p)
+        
+        safe_p = clean_p.encode('latin-1', 'replace').decode('latin-1')
+        
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(51, 65, 85)
+        pdf.multi_cell(190, 6, safe_p)
 
 def generate_report_pdf(res: dict, query: str) -> bytes:
     pdf = PDFReport()
@@ -86,51 +160,54 @@ def generate_report_pdf(res: dict, query: str) -> bytes:
     # Title
     pdf.set_font("Helvetica", "B", 16)
     pdf.set_text_color(15, 23, 42)
-    pdf.cell(0, 10, "Research & Quality Audit Report", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 10, "Research & Quality Audit Report", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(71, 85, 105)
-    safe_q = query.encode('latin-1', 'replace').decode('latin-1')
+    safe_q = clean_text_for_pdf(query).encode('latin-1', 'replace').decode('latin-1')
     safe_req = str(res.get('request_id', 'N/A')).encode('latin-1', 'replace').decode('latin-1')
-    pdf.cell(0, 6, f"Query: {safe_q}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Request ID: {safe_req}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 6, f"Query: {safe_q}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 6, f"Request ID: {safe_req}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 6, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
     
     # Section 1: Executive Summary
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 8, "1. Executive Research Answer", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 8, "1. Executive Research Answer", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
     
     answer_text = res.get("answer", "No answer generated.")
-    safe_answer = answer_text.encode('latin-1', 'replace').decode('latin-1')
-    
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(51, 65, 85)
-    pdf.multi_cell(0, 6, safe_answer)
+    parse_markdown_to_pdf(pdf, answer_text)
     pdf.ln(4)
     
     # Section 2: Sources
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_x(pdf.l_margin)
+    pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 8, "2. Information Sources", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 8, "2. Information Sources", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
     
     sources = res.get("sources", [])
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(37, 99, 235)
     if sources:
         for src in sources:
+            pdf.set_x(pdf.l_margin)
             safe_src = str(src).encode('latin-1', 'replace').decode('latin-1')
-            pdf.cell(0, 6, f"- {safe_src}", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(190, 6, f"- {safe_src}", new_x="LMARGIN", new_y="NEXT")
     else:
+        pdf.set_x(pdf.l_margin)
         pdf.set_text_color(100, 116, 139)
-        pdf.cell(0, 6, "- No reference sources available.", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(190, 6, "- No reference sources available.", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
     
     # Section 3: Quality Validation
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_x(pdf.l_margin)
+    pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 8, "3. Quality Validation Breakdown", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 8, "3. Quality Validation Breakdown", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
     
     val = res.get("validation", {})
     score = res.get("validation_score", 0.0)
@@ -138,21 +215,28 @@ def generate_report_pdf(res: dict, query: str) -> bytes:
     
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(51, 65, 85)
-    pdf.cell(0, 6, f"Overall Quality Score: {score:.2f} ({score_status})", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Relevance Score: {val.get('relevance_score', 0.0):.2f}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Completeness Score: {val.get('completeness_score', 0.0):.2f}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Accuracy Confidence: {val.get('accuracy_confidence', 0.0):.2f}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Overall Quality Score: {score:.2f} ({score_status})", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Relevance Score: {val.get('relevance_score', 0.0):.2f}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Completeness Score: {val.get('completeness_score', 0.0):.2f}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Accuracy Confidence: {val.get('accuracy_confidence', 0.0):.2f}", new_x="LMARGIN", new_y="NEXT")
     
     issues = val.get("issues", [])
     issues_str = ", ".join(issues) if issues else "None"
-    safe_issues = issues_str.encode('latin-1', 'replace').decode('latin-1')
-    pdf.cell(0, 6, f"Issues Flagged: {safe_issues}", new_x="LMARGIN", new_y="NEXT")
+    safe_issues = clean_text_for_pdf(issues_str).encode('latin-1', 'replace').decode('latin-1')
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Issues Flagged: {safe_issues}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
     
     # Section 4: Performance Metrics
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_x(pdf.l_margin)
+    pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 8, "4. Performance Metrics", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(190, 8, "4. Performance Metrics", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
     
     metrics = res.get("metrics", {})
     total_tokens = metrics.get('total_tokens') or (metrics.get('total_input_tokens', 0) + metrics.get('total_output_tokens', 0))
@@ -161,10 +245,14 @@ def generate_report_pdf(res: dict, query: str) -> bytes:
     chunks = metrics.get('stored_chunks', metrics.get('breakdown', {}).get('chunks_stored', 0))
     
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Total Latency: {latency:.2f}s", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Total Tokens Consumed: {total_tokens}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Estimated Cost: ${cost:.6f}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Vector DB Chunks Stored: {chunks}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Total Latency: {latency:.2f}s", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Total Tokens Consumed: {total_tokens}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Estimated Cost: ${cost:.6f}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_x(pdf.l_margin)
+    pdf.cell(190, 6, f"Vector DB Chunks Stored: {chunks}", new_x="LMARGIN", new_y="NEXT")
     
     return bytes(pdf.output())
 
