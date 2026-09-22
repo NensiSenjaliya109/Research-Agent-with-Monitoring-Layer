@@ -47,16 +47,16 @@ class ResearchAgent:
 
         Returns:
           {
-            "raw_results"  : List[str],   ← raw snippets from search
+            "raw_results"  : List[dict],   ← raw dicts from search (text + url)
             "stored_chunks": int,          ← number of chunks stored in DB
-            "sources"      : List[str],    ← source labels for provenance
+            "sources"      : List[str],    ← source URLs for provenance
           }
         """
         logger.info(f"[ResearchAgent] Starting research for: '{query}'")
 
         # ── Step 1: Web search ──────────────────────────────────────────────
         tracker.start_step("web_search")
-        raw_results: List[str] = search_web(query, num_results=self.num_search_results)
+        raw_results: List[dict] = search_web(query, num_results=self.num_search_results)
         tracker.end_step("web_search")
 
         if not raw_results:
@@ -70,8 +70,20 @@ class ResearchAgent:
         all_chunks = []
         all_embeddings = []
         all_metadatas = []
+        unique_sources = []
 
-        for i, result_text in enumerate(raw_results):
+        for i, result in enumerate(raw_results):
+            # Parse dict or fallback to string
+            if isinstance(result, dict):
+                result_text = result.get("text", "")
+                result_url = result.get("url", f"search_result_{i+1}")
+            else:
+                result_text = result
+                result_url = f"search_result_{i+1}"
+
+            if result_url not in unique_sources:
+                unique_sources.append(result_url)
+
             # embed_chunks handles chunking + embedding in one call
             chunk_data = embed_chunks(result_text)
 
@@ -79,7 +91,7 @@ class ResearchAgent:
                 all_chunks.append(item["chunk"])
                 all_embeddings.append(item["embedding"])
                 all_metadatas.append({
-                    "source": f"search_result_{i+1}",
+                    "source": result_url,
                     "query": query,
                     "chunk_index": j,
                 })
@@ -97,7 +109,7 @@ class ResearchAgent:
         )
 
         return {
-            "raw_results": raw_results,
+            "raw_results": [r.get("text", "") if isinstance(r, dict) else r for r in raw_results],
             "stored_chunks": len(stored_ids),
-            "sources": [m["source"] for m in all_metadatas[:self.num_search_results]],
+            "sources": unique_sources,
         }

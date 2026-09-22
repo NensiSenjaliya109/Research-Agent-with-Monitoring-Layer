@@ -29,6 +29,10 @@ from tenacity import (
 
 load_dotenv()
 
+# Prevent Google GenAI SDK from preferring global GOOGLE_API_KEY over local GEMINI_API_KEY
+if "GEMINI_API_KEY" in os.environ and "GOOGLE_API_KEY" in os.environ:
+    os.environ.pop("GOOGLE_API_KEY", None)
+
 logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────

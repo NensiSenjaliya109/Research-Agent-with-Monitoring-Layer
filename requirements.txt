@@ -7,15 +7,17 @@ httpx==0.27.0
 requests==2.31.0
 
 # ── Google Gemini ─────────────────────────────────────────
-google-generativeai==0.7.2
+google-genai
 
 # ── Vector Database ───────────────────────────────────────
 chromadb==0.5.0
 
-# ── Embeddings (free offline fallback) ────────────────────
+# ── Embeddings ────────────────────────────────────────────
 sentence-transformers==3.0.1
 
 # ── Utilities ─────────────────────────────────────────────
 tiktoken==0.7.0
 tenacity==8.3.0
+
+# ── Frontend ───────────────────────────────────────────────
 streamlit==1.35.0

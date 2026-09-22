@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import time
 import os
 import sys
@@ -67,13 +67,19 @@ with st.sidebar:
     # Environment Status Indicators
     st.markdown("### Status")
     gemini_ok = bool(os.getenv("GEMINI_API_KEY"))
-    serp_ok = bool(os.getenv("SERPAPI_API_KEY"))
+    serp_ok = bool(os.getenv("SERPAPI_KEY")) or bool(os.getenv("SERPAPI_API_KEY"))
+    tavily_ok = bool(os.getenv("TAVILY_API_KEY"))
     
     col_g, col_s = st.columns(2)
     with col_g:
         st.markdown(f"**Gemini API**<br>{'🟢 Connected' if gemini_ok else '🔴 Missing'}", unsafe_allow_html=True)
     with col_s:
-        st.markdown(f"**SerpAPI**<br>{'🟢 Live' if serp_ok else '🟡 Simulated'}", unsafe_allow_html=True)
+        if tavily_ok:
+            st.markdown(f"**Tavily API**<br>🟢 Connected", unsafe_allow_html=True)
+        elif serp_ok:
+            st.markdown(f"**SerpAPI**<br>🟢 Connected", unsafe_allow_html=True)
+        else:
+            st.markdown(f"**Search API**<br>🟡 Simulated", unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown("### 📋 Research History")
@@ -211,7 +217,10 @@ if st.session_state.research_results:
         sources = res.get("sources", [])
         if sources:
             for i, src in enumerate(sources):
-                st.markdown(f"- [{src}]({src})")
+                if src.startswith("http://") or src.startswith("https://"):
+                    st.markdown(f"- [{src}]({src})")
+                else:
+                    st.markdown(f"- 📄 {src}")
         else:
             st.warning("No reference sources available for this query.")
             
@@ -246,13 +255,18 @@ if st.session_state.research_results:
         st.markdown("### ⚡ Metrics Tracker")
         metrics = res.get("metrics", {})
         
+        # Calculate total tokens dynamically if the overall key is missing (fallback for history logs)
+        total_tokens = metrics.get('total_tokens') or (metrics.get('total_input_tokens', 0) + metrics.get('total_output_tokens', 0))
+        
         m_col1, m_col2 = st.columns(2)
         with m_col1:
             st.metric("Total Latency", f"{metrics.get('total_latency_s', metrics.get('latency_seconds', 0.0)):.2f}s")
-            st.metric("Estimated Cost", f"${metrics.get('estimated_cost_usd', 0.0):.5f}")
+            cost = metrics.get('estimated_cost_usd', 0.0)
+            st.metric("Estimated Cost", f"${cost:.6f}" if cost > 0 else "$0.000000")
         with m_col2:
-            st.metric("Total Tokens", f"{metrics.get('total_tokens', 0)}")
-            st.metric("DB Chunks Stored", f"{metrics.get('breakdown', {}).get('chunks_stored', 0)}")
+            st.metric("Total Tokens", f"{total_tokens}")
+            chunks = metrics.get('stored_chunks', metrics.get('breakdown', {}).get('chunks_stored', 0))
+            st.metric("DB Chunks Stored", f"{chunks}")
             
         # Latency breakdown chart
         st.markdown("**Execution Latency Breakdown**")

@@ -92,7 +92,7 @@ class ValidatorAgent:
         gemini_response = generate_text(
             prompt=prompt,
             temperature=0.1,       # Very low — we want consistent scoring
-            max_output_tokens=512,
+            max_output_tokens=1024,
         )
         tracker.end_step("validation")
 
@@ -119,9 +119,23 @@ def _parse_validation_json(raw_text: str) -> dict:
     Falls back to defaults if parsing fails.
     """
     try:
+        # Robustly extract JSON object between first { and last }
+        start_idx = raw_text.find('{')
+        end_idx = raw_text.rfind('}')
+        if start_idx != -1 and end_idx != -1:
+            cleaned = raw_text[start_idx:end_idx+1].strip()
+        else:
+            cleaned = raw_text.strip()
+
         # Strip any markdown code fences the model might add
-        cleaned = re.sub(r"```(?:json)?", "", raw_text).strip()
+        cleaned = re.sub(r"```(?:json)?", "", cleaned).strip()
         cleaned = cleaned.strip("`").strip()
+
+        # Fix Python-style values that are not valid JSON
+        cleaned = cleaned.replace(": True", ": true")
+        cleaned = cleaned.replace(": False", ": false")
+        cleaned = cleaned.replace(": None", ": null")
+
         data = json.loads(cleaned)
 
         return {

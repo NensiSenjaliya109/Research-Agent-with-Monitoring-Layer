@@ -29,6 +29,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "").strip()
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "").strip()
 
 
 # ── Simulated Search Data ─────────────────────────────────────────────────────
@@ -81,20 +82,33 @@ _DEFAULT_RESULTS = [
 ]
 
 
-def _simulated_search(query: str, num_results: int = 5) -> List[str]:
+def _simulated_search(query: str, num_results: int = 5) -> List[dict]:
     """Return mock search results based on query keywords."""
     query_lower = query.lower()
     for keyword, results in _MOCK_DATABASE.items():
         if keyword in query_lower:
             logger.info(f"[SimSearch] matched topic: '{keyword}'")
-            return results[:num_results]
+            formatted_keyword = keyword.replace(" ", "_")
+            return [
+                {
+                    "text": text,
+                    "url": f"https://en.wikipedia.org/wiki/{formatted_keyword}#section_{i+1}"
+                }
+                for i, text in enumerate(results[:num_results])
+            ]
 
     # Generic fallback for any topic not in our mock database
     logger.info(f"[SimSearch] no keyword match for '{query}', using defaults")
-    return [f"Regarding '{query}': {r}" for r in _DEFAULT_RESULTS[:num_results]]
+    return [
+        {
+            "text": f"Regarding '{query}': {r}",
+            "url": f"https://example.com/search?q={query.replace(' ', '+')}"
+        }
+        for r in _DEFAULT_RESULTS[:num_results]
+    ]
 
 
-def _serpapi_search(query: str, num_results: int = 5) -> List[str]:
+def _serpapi_search(query: str, num_results: int = 5) -> List[dict]:
     """Perform real web search via SerpAPI."""
     params = {
         "q": query,
@@ -115,8 +129,12 @@ def _serpapi_search(query: str, num_results: int = 5) -> List[str]:
         # Extract organic search result snippets
         for item in data.get("organic_results", []):
             snippet = item.get("snippet", "")
+            link = item.get("link", "")
             if snippet:
-                results.append(snippet)
+                results.append({
+                    "text": snippet,
+                    "url": link or f"https://example.com/search?q={query.replace(' ', '+')}"
+                })
 
         logger.info(f"[SerpAPI] got {len(results)} results for '{query}'")
         return results[:num_results]
@@ -126,16 +144,48 @@ def _serpapi_search(query: str, num_results: int = 5) -> List[str]:
         return _simulated_search(query, num_results)
 
 
+def _tavily_search(query: str, num_results: int = 5) -> List[dict]:
+    """Perform real web search via Tavily API."""
+    url = "https://api.tavily.com/search"
+    payload = {
+        "api_key": TAVILY_API_KEY,
+        "query": query,
+        "max_results": num_results
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        results = []
+        for item in data.get("results", []):
+            content = item.get("content", "")
+            link = item.get("url", "")
+            if content:
+                results.append({
+                    "text": content,
+                    "url": link
+                })
+        logger.info(f"[Tavily] got {len(results)} results for '{query}'")
+        return results[:num_results]
+    except Exception as e:
+        logger.error(f"[Tavily] search failed: {e}. Falling back to simulated search.")
+        return _simulated_search(query, num_results)
+
+
 # ── Public Interface ──────────────────────────────────────────────────────────
 
-def search_web(query: str, num_results: int = 5) -> List[str]:
+def search_web(query: str, num_results: int = 5) -> List[dict]:
     """
-    Main tool: search_web(query) → List[str]
+    Main tool: search_web(query) → List[dict]
 
-    Automatically selects real (SerpAPI) or simulated mode.
-    Returns a list of text snippets — ready to feed into the research agent.
+    Automatically selects Tavily, SerpAPI, or simulated mode.
+    Returns a list of dicts with text and source URL.
     """
-    if SERPAPI_KEY:
+    if TAVILY_API_KEY:
+        logger.info(f"[WebSearch] MODE=Tavily | query='{query}'")
+        return _tavily_search(query, num_results)
+    elif SERPAPI_KEY:
         logger.info(f"[WebSearch] MODE=SerpAPI | query='{query}'")
         return _serpapi_search(query, num_results)
     else:

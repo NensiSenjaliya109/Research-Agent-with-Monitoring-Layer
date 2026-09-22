@@ -70,6 +70,7 @@ class Orchestrator:
         answer = ""
         sources = []
         validation = {}
+        stored_chunks = 0
         error_msg = None
 
         try:
@@ -77,6 +78,7 @@ class Orchestrator:
             logger.info(f"[Orchestrator] Stage 1: Research")
             research_output = self.research_agent.run(query, tracker)
             sources = research_output.get("sources", [])
+            stored_chunks = research_output.get("stored_chunks", 0)
 
             logger.info(
                 f"[Orchestrator] Research complete. "
@@ -137,7 +139,10 @@ class Orchestrator:
             "sources": sources,
             "validation": validation,
             "validation_score": validation.get("overall_score", 0.0),
-            "metrics": record["metrics"],
+            "metrics": {
+                **record["metrics"],
+                "stored_chunks": stored_chunks,
+            },
             "error": error_msg,
         }
 
